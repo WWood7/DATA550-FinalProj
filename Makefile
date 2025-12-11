@@ -24,7 +24,7 @@ report-macos:
 
 report-windows:
 	mkdir -p report
-	docker run -v \"$$(pwd)/report":/project/final_report $(IMAGE_NAME)
+	docker run -v "/$$(pwd)/report":/project/final_report $(IMAGE_NAME)
 
 clean:
 	rm -f Final_Proj2.html output/table1.rds output/plot.png
