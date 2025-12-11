@@ -15,29 +15,7 @@ knitr::opts_chunk$set(
 )
 ```
 
-```{r, libraries}
-library(ggplot2)
-library(sl3)
-library(tidyverse)
-library(gtsummary)
-library(scales)
-library(gt)
-```
 
-
-```{r, data loading and preprocessing}
-data <- read.csv("lung_cancer_dataset.csv")
-
-# factorize the categorical variables
-data$gender <- factor(data$gender)
-data$radon_exposure <- factor(data$radon_exposure)
-data$asbestos_exposure <- factor(data$asbestos_exposure)
-data$secondhand_smoke_exposure <- factor(data$secondhand_smoke_exposure)
-data$copd_diagnosis <- factor(data$copd_diagnosis)
-data$alcohol_consumption <- factor(data$alcohol_consumption)
-data$family_history <- factor(data$family_history)
-data$lung_cancer <- factor(data$lung_cancer)
-```
 
 ### Introduction
 This dataset is from Kaggle, designed for lung cancer risk analysis. It contains 50,000 clean, processed profiles from patients who constantly smoke cigarettes, with features based on established lung cancer risk factors such as smoking exposure, environmental exposures, and chronic lung conditions. All data is synthetic and designed to reflect realistic risk factor distributions while maintaining patient privacy.
@@ -70,49 +48,7 @@ The following table summarizes the characteristics of all variables in the datas
 \FloatBarrier
 
 ```{r, descriptive statistics, results='asis'}
-# get a table one for the data, excluding ID and showing all levels
-tbl_summary_object <- data %>%
-  select(-patient_id) %>%  # exclude the id variable
-  tbl_summary(
-    type = list(
-      # Force binary variables to show both levels
-      radon_exposure ~ "categorical",
-      asbestos_exposure ~ "categorical", 
-      secondhand_smoke_exposure ~ "categorical",
-      copd_diagnosis ~ "categorical",
-      alcohol_consumption ~ "categorical",
-      family_history ~ "categorical",
-      lung_cancer ~ "categorical",
-      gender ~ "categorical"
-    ),
-    statistic = list(
-      # For categorical variables, show n (%)
-      all_categorical() ~ "{n} ({p}%)",
-      # For continuous variables, show median (IQR)
-      all_continuous() ~ "{median} ({p25}, {p75})"
-    )
-  ) %>%
-  # Add variable labels for better readability
-  modify_header(label ~ "**Variable**") %>%
-  modify_spanning_header(c("stat_0") ~ "**Overall, N = {N}**")
-
-# Convert to gt with larger formatting
-tbl_summary_object %>% 
-  as_gt() %>%
-  tab_options(
-    table.font.size = 12,
-    data_row.padding = px(8),
-    summary_row.padding = px(8),
-    grand_summary_row.padding = px(8),
-    footnotes.font.size = 10,
-    source_notes.font.size = 10,
-    heading.subtitle.font.size = 13,
-    heading.title.font.size = 15,
-    table.width = pct(100),
-    column_labels.font.weight = "bold",
-    table.margin.left = px(10),
-    table.margin.right = px(10)
-  )
+readRDS("output/table1.rds")
 
 ```
 
@@ -120,90 +56,13 @@ tbl_summary_object %>%
 
 \vspace{1cm}
 
-This table provides a comprehensive overview of the dataset, showing the distribution of each variable across all patients. For continuous variables, the table shows the median and interquartile range, and shows the number of observations and percentage for categorical variables in each level.
+This table provides a comprehensive overview of the dataset, showing the distribution of each variable across all patients. The table displays summary statistics for continuous variables and counts with percentages for categorical variables.
 
 It is useful for understanding the baseline characteristics of the population and for identifying any potential patterns or differences in the data.
 
 
 ### Data Analysis
-```{r, data analysis, fig.height=4, fig.width=7}
-# define a learner to run the classification task
-lr <- Lrnr_gam$new()
-
-# define the covariates
-w_vars <- c(
-    "age", "gender", "radon_exposure", "asbestos_exposure", "pack_years",
-    "secondhand_smoke_exposure", "copd_diagnosis", "alcohol_consumption",
-    "family_history"
-)
-
-# define the outcome
-y_var <- c("lung_cancer")
-
-# define a task
-task <- make_sl3_Task(
-    data = data,
-    outcome = y_var,
-    covariates = w_vars
-)
-
-# fit the task
-fit <- lr$train(task)
-
-# create a dummy data for prediction with proper factor levels
-dummy_data <- data.frame(
-    age = 50,
-    gender = factor("Male", levels = levels(data$gender)),
-    radon_exposure = factor("Low", levels = levels(data$radon_exposure)),
-    asbestos_exposure = factor("No", levels = levels(data$asbestos_exposure)),
-    pack_years = seq(0, 50, 0.1),
-    secondhand_smoke_exposure = factor("No", levels = levels(data$secondhand_smoke_exposure)),
-    copd_diagnosis = factor("No", levels = levels(data$copd_diagnosis)),
-    alcohol_consumption = factor("None", levels = levels(data$alcohol_consumption)),
-    family_history = factor("No", levels = levels(data$family_history))
-)
-
-# define the new task for prediction (no outcome variable needed)
-new_task <- make_sl3_Task(
-    data = dummy_data,
-    covariates = w_vars
-)
-
-# predict the probability of developing lung cancer
-pred <- fit$predict(new_task)
-
-# plot the result
-ggplot(data = dummy_data, aes(x = pack_years, y = pred)) +
-    geom_line(color = "darkred", size = 1.2) +
-    scale_y_continuous(
-        labels = scales::percent_format(accuracy = 1),
-        limits = c(0, max(pred) * 1.05),
-        breaks = scales::pretty_breaks(n = 6)
-    ) +
-    scale_x_continuous(
-        breaks = scales::pretty_breaks(n = 8),
-        limits = c(0, 50)
-    ) +
-    labs(
-        title = "Predicted Lung Cancer Risk by Smoking Exposure",
-        subtitle = "50-year-old male with no other risk factors",
-        x = "Pack Years (Packs per day × Years of smoking)",
-        y = "Predicted Probability of Lung Cancer",
-        caption = "Based on GAM model fitted to lung cancer risk dataset"
-    ) +
-    theme_minimal() +
-    theme(
-        plot.title = element_text(size = 14, face = "bold", hjust = 0.5),
-        plot.subtitle = element_text(size = 11, hjust = 0.5, color = "gray60"),
-        plot.caption = element_text(size = 9, color = "gray50"),
-        axis.title = element_text(size = 11, face = "bold"),
-        axis.text = element_text(size = 10),
-        panel.grid.minor = element_blank(),
-        panel.grid.major = element_line(color = "gray90", size = 0.5),
-        plot.background = element_rect(fill = "white", color = NA)
-    )
-
-```
+![](output/plot.png)
 
 \vspace{1cm}
 
