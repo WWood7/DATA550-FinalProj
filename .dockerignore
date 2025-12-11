@@ -1,0 +1,6 @@
+# .dockerignore
+Final_Proj2.html
+output/
+report/
+.git
+.DS_Store
